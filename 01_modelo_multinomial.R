@@ -1,70 +1,84 @@
 # ==============================================================================
 # CAPÍTULO 1: MODELO MULTINOMIAL CLÁSICO
-# Objetivo: Estimación, diagnóstico y predicción del sistema de calefacción
+# Selección de variables (Backward Elimination) y predicción final
 # ==============================================================================
 
 # --- 1. CONFIGURACIÓN INICIAL Y CARGA DE DATOS ---
 library(mlogit)
-
-# Carga del dataset original de sistemas de calefacción
 data("Heating", package = "mlogit")
 
-
 # --- 2. PREPARACIÓN DE LOS DATOS ---
-# Transformación del dataframe a formato indexado requerido por mlogit
+# Conversión al formato indexado long/wide requerido por mlogit
 H <- dfidx(Heating, choice = "depvar", varying = c(3:12))
 
+# --- 3. PROCESO DE SELECCIÓN HACIA ATRÁS (BACKWARD ELIMINATION) ---
 
-# --- 3. AJUSTE DEL MODELO MULTINOMIAL CLÁSICO ---
-# Se asume 0 atributos de las alternativas y se evalúan solo variables del individuo
-modelo_clasico <- mlogit(depvar ~ 0 | income + agehed + rooms, data = H)
+# Paso 1: Ajuste del modelo completo saturado
+modelo_completo <- mlogit(depvar ~ 0 | income + agehed + rooms, data = H)
+cat("\n>>> RESUMEN: MODELO COMPLETO <<<\n")
+print(summary(modelo_completo))
 
+# Paso 2: Exclusión de la variable menos significativa ('income') y reajuste
+modelo_paso2 <- mlogit(depvar ~ 0 | agehed + rooms, data = H)
+cat("\n>>> RESUMEN: PASO 2 (SIN INCOME) <<<\n")
+print(summary(modelo_paso2))
 
-# --- 4. EVALUACIÓN Y DIAGNÓSTICO DEL MODELO ---
-# Resumen general del modelo estimado (Test de Wald)
-summary(modelo_clasico)
+# Paso 3: Exclusión de la siguiente variable no significativa ('rooms') -> Modelo óptimo
+modelo_final <- mlogit(depvar ~ 0 | agehed, data = H)
+cat("\n>>> RESUMEN: MODELO FINAL DEPURADO (SOLO AGEHED) <<<\n")
+print(summary(modelo_final))
 
-# Extracción de los Criterios de Selección de Modelos (AIC y BIC)
-cat("\n=========================================\n")
-cat("      CRITERIOS DE SELECCIÓN DE MODELOS    \n")
-cat("=========================================\n")
-cat("AIC:", AIC(modelo_clasico), "\n")
-cat("BIC:", BIC(modelo_clasico), "\n\n")
+# --- 4. DIAGNÓSTICO Y COMPARATIVA DE MODELOS ---
 
-# Cálculo de los Intervalos de Confianza al 95%
-# Basados en la matriz de varianzas-covarianzas (Inversa de la Información de Fisher)
-cat("=========================================\n")
-cat("   INTERVALOS DE CONFIANZA (NIVEL 95%)   \n")
-cat("=========================================\n")
-intervalos <- confint(modelo_clasico)
-print(round(intervalos, 4))
-cat("\n")
+# Evaluación global mediante Criterio de Información de Akaike (AIC)
+cat("\n>>> COMPARATIVA DE DIAGNÓSTICO (AIC) <<<\n")
+cat("Modelo Completo :", AIC(modelo_completo), "\n")
+cat("Modelo Paso 2   :", AIC(modelo_paso2), "\n")
+cat("Modelo Final    :", AIC(modelo_final), "\n")
 
+# Intervalos de confianza asintóticos (95%) del modelo parsimonioso
+cat("\n>>> INTERVALOS DE CONFIANZA - MODELO FINAL (95%) <<<\n")
+print(round(confint(modelo_final), 4))
 
-# --- 5. SIMULACIÓN Y PREDICCIÓN DE PROBABILIDADES ---
-# Propósito: Evaluar el impacto aislado de la edad del cabeza de familia
+# --- 5. VERIFICACIÓN METODOLÓGICA DE LOS INTERVALOS DE CONFIANZA ---
+# Obtención manual basada en la estimación y la inversa de la matriz de Fisher
+cat("\n>>> DESGLOSE ASINTÓTICO DEL IC (ALTERNATIVA ER) <<<\n")
 
-# 1. Selección de dos perfiles reales de la base de datos para la simulación
+# Extracción de coeficientes y errores estándar en el paso de su respectiva evaluación
+beta_inc_er  <- coef(modelo_completo)["income:er"]
+ee_inc_er    <- sqrt(diag(vcov(modelo_completo)))["income:er"]
+
+beta_room_er <- coef(modelo_paso2)["rooms:er"]
+ee_room_er   <- sqrt(diag(vcov(modelo_paso2)))["rooms:er"]
+
+beta_age_er  <- coef(modelo_final)["agehed:er"]
+ee_age_er    <- sqrt(diag(vcov(modelo_final)))["agehed:er"]
+
+z_critico    <- qnorm(0.975) # Cuantil normal estándar
+
+cat("IC 95% Income (er) [Mod. Completo]: [", 
+    round(beta_inc_er - z_critico * ee_inc_er, 4), ", ", 
+    round(beta_inc_er + z_critico * ee_inc_er, 4), "]\n")
+
+cat("IC 95% Rooms (er)  [Mod. Paso 2]:   [", 
+    round(beta_room_er - z_critico * ee_room_er, 4), ", ", 
+    round(beta_room_er + z_critico * ee_room_er, 4), "]\n")
+
+cat("IC 95% Agehed (er) [Mod. Final]:    [", 
+    round(beta_age_er - z_critico * ee_age_er, 4), ", ", 
+    round(beta_age_er + z_critico * ee_age_er, 4), "]\n")
+
+# --- 6. SIMULACIÓN Y PREDICCIÓN DE PROBABILIDADES ---
+# Análisis de escenarios para evaluar el impacto aislado de la edad (30 vs 70 años)
 casas_simuladas <- Heating[1:2, ]
+casas_simuladas$agehed[1] <- 30  # Escenario A: Decisor joven
+casas_simuladas$agehed[2] <- 70  # Escenario B: Decisor mayor
 
-# 2. Control de variables: Se fijan los ingresos y habitaciones en sus valores medios
-casas_simuladas$income <- mean(Heating$income)
-casas_simuladas$rooms  <- mean(Heating$rooms)
-
-# 3. Escenarios: Forzamos la diferencia de edad para comparar los perfiles
-casas_simuladas$agehed[1] <- 30  # Escenario A: Cabeza de familia joven
-casas_simuladas$agehed[2] <- 70  # Escenario B: Cabeza de familia mayor
-
-# 4. Indexación del nuevo mini-dataset simulado
 H_simulado <- dfidx(casas_simuladas, choice = "depvar", varying = c(3:12))
 
-# 5. Obtención y formateo de las cuotas de probabilidad predichas
-probabilidades <- predict(modelo_clasico, newdata = H_simulado)
+# Generación de cuotas de mercado condicionales con el modelo final óptimo
+probabilidades <- predict(modelo_final, newdata = H_simulado)
 rownames(probabilidades) <- c("Familia Joven (30 años)", "Familia Mayor (70 años)")
 
-# Impresión final de resultados predictivos en formato porcentual
-cat("=========================================\n")
-cat("       PROBABILIDADES PREDICHAS (%)      \n")
-cat("=========================================\n")
+cat("\n>>> PROBABILIDADES PREDICHAS DEL SISTEMA (%) <<<\n")
 print(round(probabilidades * 100, 2))
-cat("=========================================\n")
