@@ -61,3 +61,29 @@ if (isS4(modelo_gdm)) {
 } else {
   print(modelo_gdm$wald.p)
 }
+
+# --- 6. INTERVALOS DE CONFIANZA ---
+# Obtención manual basada en la estimación y los errores estándar asintóticos
+cat("\n>>> DESGLOSE DEL IC PARA EL TRATAMIENTO (EXÓN X2) <<<\n")
+
+# 1. Extracción para el parámetro Gamma (vínculo de la probabilidad)
+# Fila 2 (treatment), Columna 2 (X2) en la matriz de coeficientes y SE
+beta_gamma_trat_X2 <- coef(modelo_gdm)[2, 2]
+ee_gamma_trat_X2   <- modelo_gdm@SE[2, 2]
+
+# 2. Extracción para el parámetro Delta (vínculo de la dispersión)
+# Fila 2 (treatment), Columna 7 (X2 en la segunda matriz)
+# Nota: MGLM junta las dos matrices por columnas en @SE: cols 1:5 son Gamma, cols 6:10 son Delta
+beta_delta_trat_X2 <- coef(modelo_gdm)[2, 7]
+ee_delta_trat_X2   <- modelo_gdm@SE[2, 7]
+
+z_critico <- qnorm(0.975)  # Cuantil normal estándar para el 95% de confianza
+
+# Cálculo e impresión de los límites del intervalo
+cat("IC 95% Gamma Tratamiento (X2): [", 
+    round(beta_gamma_trat_X2 - z_critico * ee_gamma_trat_X2, 4), ", ", 
+    round(beta_gamma_trat_X2 + z_critico * ee_gamma_trat_X2, 4), "]\n")
+
+cat("IC 95% Delta Tratamiento (X2): [", 
+    round(beta_delta_trat_X2 - z_critico * ee_delta_trat_X2, 4), ", ", 
+    round(beta_delta_trat_X2 + z_critico * ee_delta_trat_X2, 4), "]\n")
