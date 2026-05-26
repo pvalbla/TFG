@@ -66,16 +66,15 @@ if (isS4(modelo_gdm)) {
 # Obtención manual basada en la estimación y los errores estándar asintóticos
 cat("\n>>> DESGLOSE DEL IC PARA EL TRATAMIENTO (EXÓN X2) <<<\n")
 
-# 1. Extracción para el parámetro Gamma (vínculo de la probabilidad)
-# Fila 2 (treatment), Columna 2 (X2) en la matriz de coeficientes y SE
-beta_gamma_trat_X2 <- coef(modelo_gdm)[2, 2]
-ee_gamma_trat_X2   <- modelo_gdm@SE[2, 2]
+# 1. Extracción para el parámetro Gamma (vínculo del volumen de copias)
+# Fila 2 (treatment), Columna 3 (Física para alpha_X2 según la salida de R)
+beta_gamma_trat_X2 <- coef(modelo_gdm)[2, 3]
+ee_gamma_trat_X2   <- modelo_gdm@SE[2, 3]
 
-# 2. Extracción para el parámetro Delta (vínculo de la dispersión)
-# Fila 2 (treatment), Columna 7 (X2 en la segunda matriz)
-# Nota: MGLM junta las dos matrices por columnas en @SE: cols 1:5 son Gamma, cols 6:10 son Delta
-beta_delta_trat_X2 <- coef(modelo_gdm)[2, 7]
-ee_delta_trat_X2   <- modelo_gdm@SE[2, 7]
+# 2. Extracción para el parámetro Delta (vínculo del ruido/dispersión)
+# Fila 2 (treatment), Columna 8 (Física para beta_X2: 5 columnas de alpha + 3)
+beta_delta_trat_X2 <- coef(modelo_gdm)[2, 8]
+ee_delta_trat_X2   <- modelo_gdm@SE[2, 8]
 
 z_critico <- qnorm(0.975)  # Cuantil normal estándar para el 95% de confianza
 
